@@ -9,33 +9,18 @@ import {
   Button,
 } from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
+import {atob, btoa} from 'react-native-quick-base64';
 import {faBluetooth} from '@fortawesome/free-brands-svg-icons/faBluetooth';
-import RNBluetoothClassic from 'react-native-bluetooth-classic';
-
 import {combinations} from '../utils/communicationUtils';
+import {BleManager} from 'react-native-ble-plx';
+const bleManager = new BleManager();
 
-// Context API hooks
-import {useBluetooth} from '../contextAPI/BluetoothContext';
-import {useCommunication} from '../contextAPI/CommunicationContext';
-import axios from 'axios';
+const CommunicationScreen = ({route}) => {
+  const user = route && route.params ? route.params.user : null;
 
-const CommunicationScreen = ({navigation, route}) => {
-  const user = route.params.user;
-
-  const getvisitLength = async () => {
-    try {
-      const response = await axios.get(
-        `http://192.168.1.100:4000/api/v1/visitlenght/659dbc76718cf4d3a3affd6c`,
-      );
-      console.log(response.data);
-    } catch (error) {
-      console.log(error.message);
-    }
-  };
-
-  const {state, dispatch} = useBluetooth();
-  const {state: communicationState, dispatch: communicationDispatch} =
-    useCommunication();
+  const [deviceID, setDeviceID] = useState(null);
+  const [onData, setOnData] = useState([]);
+  const [connectionStatus, setConnectionStatus] = useState('Searching...');
 
   const startFreqRef = useRef(0);
   const endFreqRef = useRef(0);
@@ -44,128 +29,160 @@ const CommunicationScreen = ({navigation, route}) => {
   const index = useRef(0);
   const collecting = useRef(false);
 
-  const [onData, setOnData] = useState([]);
-  const [CompleteData, setCompleteData] = useState([]);
+  const deviceRef = useRef(null);
+  const commadcharacteristicRef = useRef(null);
 
-  let readSubscription = null;
-  let disconnectSubscription = null;
+  const SERVICE_UUID_SENSOR = '9b3333b4-8307-471b-95d1-17fa46507379';
+  const CHARACTERISTIC_UUID_BIZA = 'a420b5f0-43d0-442b-bd01-8fa42172fb67';
+  const CHARACTERISTIC_UUID_PHSA = '728c78e4-ed4c-4c06-abe3-c2c4d365f7c3';
+  const CHARACTERISTIC_UUID_COMMAND = 'ea8145ec-d810-471a-877e-177ce5841b63';
+  const CHARACTERRISTIC_UUID_CONTROL = 'e344743b-a3c0-4bc3-9449-9ef1eb2f8355';
+
+  const searchAndConnectToDevice = () => {
+    bleManager.startDeviceScan(null, null, (error, device) => {
+      if (error) {
+        console.error(error);
+        setConnectionStatus('Error searching for devices');
+        return;
+      }
+      if (device.name === 'IHUBDATA') {
+        bleManager.stopDeviceScan();
+        setConnectionStatus('Connecting...');
+        connectToDevice(device);
+      }
+    });
+  };
 
   useEffect(() => {
-    getvisitLength();
-    setTimeout(() => connect(), 0);
+    searchAndConnectToDevice();
 
-    return () => disconnect(); // Cleanup on component unmount
+    return () => {
+      if (deviceRef.current) {
+        deviceRef.current.cancelConnection();
+        console.log('Disconnected on component unmount');
+      }
+    };
   }, []);
 
-  const connect = async () => {
-    try {
-      let connection = await state.selectedDevice.isConnected();
-      console.log(
-        `connected or Not to ${connection} ${state.selectedDevice.name}`,
-      );
-      if (!connection) {
-        let connect = await state.selectedDevice.connect(
-          communicationState.connectionOptions,
+  useEffect(() => {
+    const subscription = bleManager.onDeviceDisconnected(
+      deviceID,
+      (error, device) => {
+        if (error) {
+          console.log('Disconnected with error:', error);
+        }
+        setConnectionStatus('Disconnected');
+        console.log('Disconnected device');
+        if (deviceRef.current) {
+          setConnectionStatus('Reconnecting...');
+          connectToDevice(deviceRef.current)
+            .then(() => setConnectionStatus('Connected'))
+            .catch(error => {
+              console.log('Reconnection failed: ', error);
+              setConnectionStatus('Reconnection failed');
+            });
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [deviceID]);
+
+  const connectToDevice = device => {
+    return device
+      .connect()
+      .then(device => {
+        console.log(`device connected: ${device.id}`);
+        setDeviceID(device.id);
+        setConnectionStatus('Connected');
+        deviceRef.current = device;
+        return device.discoverAllServicesAndCharacteristics();
+      })
+      .then(device => {
+        return device.services();
+      })
+      .then(services => {
+        let service = services.find(
+          service => service.uuid === SERVICE_UUID_SENSOR,
         );
-        console.log(`connect:${connect} ${state.selectedDevice.name}`);
-        communicationDispatch({type: 'SET_CONNECTED', payload: true});
+        return service.characteristics();
+      })
+      .then(characteristics => {
+        const char1 = characteristics.find(
+          char => char.uuid === CHARACTERISTIC_UUID_BIZA,
+        );
+        const char2 = characteristics.find(
+          char => char.uuid === CHARACTERISTIC_UUID_PHSA,
+        );
+        const char3 = characteristics.find(
+          char => char.uuid === CHARACTERRISTIC_UUID_CONTROL,
+        );
+        const char4 = characteristics.find(
+          char => char.uuid === CHARACTERISTIC_UUID_COMMAND,
+        );
+
+        commadcharacteristicRef.current = char4;
+
+        if (!char1 || !char2 || !char3) {
+          throw new Error('One or more characteristics not found');
+        }
+
+        // Monitor char1 first
+        char1.monitor((error, char) => {
+          if (error) {
+            console.error(error);
+          } else {
+            const char1Data = atob(char.value);
+            console.log('Received data from characteristic 1:', char1Data);
+            // Handle data from char1 as needed
+          }
+        });
+
+        // Monitor char2 after char1
+        char2.monitor((error, char) => {
+          if (error) {
+            console.error(error);
+          } else {
+            const char2Data = atob(char.value);
+            console.log('Received data from characteristic 2:', char2Data);
+            // Handle data from char2 as needed
+          }
+        });
+
+        return char3;
+      })
+      .then(char3 => {
+        char3.monitor((error, char) => {
+          if (error) {
+            console.error(error);
+          } else {
+            const char3Data = atob(char.value);
+            console.log('Received data from characteristic 3:', char3Data);
+            // Perform actions based on the received data from char3
+          }
+        });
+      })
+      .catch(error => {
+        console.log(error);
+        setConnectionStatus('Error in Connection');
+      });
+  };
+
+  const writeDataToDevice = async data => {
+    if (deviceRef.current && commadcharacteristicRef.current) {
+      try {
+        // Convert your data to base64 using btoa
+        const encodedData = btoa(data);
+
+        // Write the data to the characteristic
+        await commadcharacteristicRef.current.writeWithResponse(encodedData);
+
+        console.log('Data written successfully');
+      } catch (error) {
+        console.error('Error writing data:', error);
       }
-      initializeRead();
-    } catch (error) {
-      console.log(`connect error:${error}`);
-    }
-  };
-
-  const initializeRead = () => {
-    disconnectSubscription = RNBluetoothClassic.onDeviceDisconnected(
-      () => disconnect(true),
-      (collecting.current = false),
-    );
-
-    readSubscription = state.selectedDevice.onDataReceived(data =>
-      onReceivedData(data.data),
-    );
-  };
-
-  const disconnect = async disconnected => {
-    try {
-      if (!disconnected) {
-        disconnected = await state.selectedDevice.disconnect();
-        communicationDispatch({type: 'SET_CONNECTED', payload: false});
-      }
-    } catch (error) {
-      console.log(`disconnect error:${error}`);
-    }
-    disconnectSubscription.remove();
-    uninitializeRead();
-  };
-
-  const uninitializeRead = () => {
-    if (readSubscription) {
-      readSubscription.remove();
-    }
-  };
-
-  const SetValueArdiuno = () => {
-    if (collecting.current) {
-      if (
-        index.current == combinations.length &&
-        startFreqRef.current < endFreqRef.current
-      ) {
-        startFreqRef.current =
-          Number(startFreqRef.current) + Number(stepsRef.current);
-        index.current = 0;
-      }
-      if (
-        index == combinations.length &&
-        startFreqRef.current === endFreqRef.current
-      ) {
-        collecting.current = false;
-        console.log('All combination Completed');
-      }
-      let currentCombination = combinations[index.current];
-      console.log(`currentCombination:${currentCombination}`);
-      let firstNumber = currentCombination[0];
-      let secondNumber = currentCombination[1];
-
-      let SetCommand = `SET:${startFreqRef.current},${dataPointsRef.current},${firstNumber},${secondNumber}`;
-      let sendCommand = SetCommand + '\n';
-      let Commandstring = sendCommand.toString();
-      sendData(Commandstring);
-    }
-  };
-
-  const onReceivedData = data => {
-    if (data.includes('100:CommandReceived:')) {
-      console.log('Command Received');
-      index.current = index.current + 1;
-      console.log(`index:${index.current}`);
-    } else if (data.includes('404:InvalidCommand')) {
-      console.log('Invalid Command');
-      SetValueArdiuno();
-    } else if (data.includes('200:Complete')) {
-      setCompleteData(prevCompleteData => [...prevCompleteData, onData]);
-      console.log('Completed one combination');
-      SetValueArdiuno();
     } else {
-      setOnData(prevOnData => [
-        ...prevOnData,
-        {
-          data: data,
-          type: 'RECEIVED',
-        },
-      ]);
+      console.error('Device or characteristic not available');
     }
-  };
-
-  const sendData = async Command => {
-    console.log(`Command:${Command}`);
-    await state.selectedDevice.write(Command);
-  };
-
-  const onPressStart = () => {
-    collecting.current = true;
-    SetValueArdiuno();
   };
 
   return (
@@ -173,11 +190,7 @@ const CommunicationScreen = ({navigation, route}) => {
       <View style={styles.headerContainer}>
         <Text style={styles.logoText}>Ihub-Data</Text>
         <View style={styles.BluetoothContainer}>
-          <FontAwesomeIcon
-            icon={faBluetooth}
-            color={communicationState.connected ? 'green' : 'red'}
-            size={25}
-          />
+          <FontAwesomeIcon icon={faBluetooth} color={'red'} size={25} />
         </View>
       </View>
       <ScrollView style={styles.scrollContainer}>
@@ -190,6 +203,9 @@ const CommunicationScreen = ({navigation, route}) => {
           </View>
         ))}
       </ScrollView>
+      <View>
+        <Text>{connectionStatus}</Text>
+      </View>
       <View style={styles.inputContainer}>
         <View style={styles.inputSubcontainer}>
           <TextInput
@@ -237,7 +253,7 @@ const CommunicationScreen = ({navigation, route}) => {
         disabled={collecting.current}
         title="Start"
         color="#fa5043"
-        onPress={() => onPressStart()}
+        onPress={() => writeDataToDevice('SET')}
         style={styles.button}
       />
     </SafeAreaView>
