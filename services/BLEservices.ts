@@ -5,11 +5,6 @@ import {
     Device,
     State as BluetoothState,
     LogLevel,
-    type DeviceId,
-    type TransactionId,
-    type UUID,
-    type Characteristic,
-    type Base64,
     type Subscription
   } from 'react-native-ble-plx'
   import { PermissionsAndroid, Platform } from 'react-native'

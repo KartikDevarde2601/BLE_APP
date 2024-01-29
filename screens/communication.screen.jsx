@@ -21,12 +21,12 @@ const CommunicationScreen = ({route}) => {
   const [deviceID, setDeviceID] = useState(null);
   const [onData, setOnData] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('Searching...');
+  const [isdeviceconnected, setIsDeviceConnected] = useState(false);
 
   const startFreqRef = useRef(0);
   const endFreqRef = useRef(0);
   const stepsRef = useRef(0);
   const dataPointsRef = useRef(0);
-  const index = useRef(0);
   const collecting = useRef(false);
 
   const deviceRef = useRef(null);
@@ -72,11 +72,15 @@ const CommunicationScreen = ({route}) => {
           console.log('Disconnected with error:', error);
         }
         setConnectionStatus('Disconnected');
+        setIsDeviceConnected(false);
         console.log('Disconnected device');
         if (deviceRef.current) {
           setConnectionStatus('Reconnecting...');
           connectToDevice(deviceRef.current)
-            .then(() => setConnectionStatus('Connected'))
+            .then(() => {
+              setConnectionStatus('Connected');
+              setIsDeviceConnected(true);
+            })
             .catch(error => {
               console.log('Reconnection failed: ', error);
               setConnectionStatus('Reconnection failed');
@@ -94,6 +98,7 @@ const CommunicationScreen = ({route}) => {
         console.log(`device connected: ${device.id}`);
         setDeviceID(device.id);
         setConnectionStatus('Connected');
+        setIsDeviceConnected(true);
         deviceRef.current = device;
         return device.discoverAllServicesAndCharacteristics();
       })
@@ -190,7 +195,11 @@ const CommunicationScreen = ({route}) => {
       <View style={styles.headerContainer}>
         <Text style={styles.logoText}>Ihub-Data</Text>
         <View style={styles.BluetoothContainer}>
-          <FontAwesomeIcon icon={faBluetooth} color={'red'} size={25} />
+          <FontAwesomeIcon
+            icon={faBluetooth}
+            color={isdeviceconnected ? 'green' : 'red'}
+            size={25}
+          />
         </View>
       </View>
       <ScrollView style={styles.scrollContainer}>
