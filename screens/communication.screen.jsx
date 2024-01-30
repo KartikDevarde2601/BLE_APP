@@ -162,7 +162,8 @@ const CommunicationScreen = ({route}) => {
           } else {
             const char3Data = atob(char.value);
             console.log('Received data from characteristic 3:', char3Data);
-            // Perform actions based on the received data from char3
+            index.current = index.current + 1;
+            writeDataToDevice();
           }
         });
       })
@@ -172,14 +173,47 @@ const CommunicationScreen = ({route}) => {
       });
   };
 
-  const writeDataToDevice = async data => {
-    if (deviceRef.current && commadcharacteristicRef.current) {
-      try {
-        // Convert your data to base64 using btoa
-        const encodedData = btoa(data);
+  const writeDataToDevice = async () => {
+    if (
+      deviceRef.current &&
+      commadcharacteristicRef.current &&
+      isdeviceconnected
+    ) {
+      if (
+        index.current == combinations.length &&
+        startFreqRef.current < endFreqRef.current
+      ) {
+        startFreqRef.current =
+          Number(startFreqRef.current) + Number(stepsRef.current);
+        index.current = 0;
+      }
 
+      if (
+        index == combinations.length &&
+        startFreqRef.current === endFreqRef.current
+      ) {
+        collecting.current = false;
+        console.log('All combination Completed');
+        return;
+      }
+
+      let currentCombination = combinations[index.current];
+      console.log(`currentCombination:${currentCombination}`);
+      let firstNumber = currentCombination[0];
+      let secondNumber = currentCombination[1];
+
+      let dataArray = [
+        startFreqRef.current,
+        dataPointsRef.current,
+        firstNumber,
+        secondNumber,
+      ];
+      // Convert array to Uint8Array
+      const dataBuffer = new Uint8Array(dataArray);
+      console.log('data to Buffer.....');
+      try {
         // Write the data to the characteristic
-        await commadcharacteristicRef.current.writeWithResponse(encodedData);
+        await commadcharacteristicRef.current.writeWithResponse(dataBuffer);
 
         console.log('Data written successfully');
       } catch (error) {
