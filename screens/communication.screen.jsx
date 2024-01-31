@@ -21,12 +21,14 @@ const CommunicationScreen = ({route}) => {
   const [deviceID, setDeviceID] = useState(null);
   const [onData, setOnData] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('Searching...');
-  const [isdeviceconnected, setIsDeviceConnected] = useState(false);
+  const [isdeviceconnected, setisdeviceconnected] = useState(false);
 
+  const ReadingDataRef = useRef(false);
   const startFreqRef = useRef(0);
   const endFreqRef = useRef(0);
   const stepsRef = useRef(0);
   const dataPointsRef = useRef(0);
+  const index = useRef(0);
   const collecting = useRef(false);
 
   const deviceRef = useRef(null);
@@ -72,14 +74,15 @@ const CommunicationScreen = ({route}) => {
           console.log('Disconnected with error:', error);
         }
         setConnectionStatus('Disconnected');
-        setIsDeviceConnected(false);
+        setisdeviceconnected(false);
+        ReadingDataRef.current = false;
         console.log('Disconnected device');
         if (deviceRef.current) {
           setConnectionStatus('Reconnecting...');
           connectToDevice(deviceRef.current)
             .then(() => {
               setConnectionStatus('Connected');
-              setIsDeviceConnected(true);
+              setisdeviceconnected(true);
             })
             .catch(error => {
               console.log('Reconnection failed: ', error);
@@ -91,6 +94,67 @@ const CommunicationScreen = ({route}) => {
     return () => subscription.remove();
   }, [deviceID]);
 
+  const onPressStart = () => {
+    ReadingDataRef.current = true;
+    setConnectionStatus('Collecting Data.....');
+    writeDataToDevice();
+  };
+
+  const writeDataToDevice = async () => {
+    if (
+      deviceRef.current &&
+      commadcharacteristicRef.current &&
+      ReadingDataRef.current
+    ) {
+      if (
+        index.current == combinations.length &&
+        startFreqRef.current < endFreqRef.current
+      ) {
+        startFreqRef.current =
+          Number(startFreqRef.current) + Number(stepsRef.current);
+        index.current = 0;
+      }
+
+      if (
+        index.current === combinations.length &&
+        startFreqRef.current === endFreqRef.current
+      ) {
+        collecting.current = false;
+        setConnectionStatus('all Data is been collected');
+        console.log('All combination Completed');
+        return;
+      }
+
+      let currentCombination = combinations[index.current];
+
+      let firstNumber = currentCombination[0];
+      let secondNumber = currentCombination[1];
+
+      let dataArray = [
+        Number(startFreqRef.current),
+        Number(dataPointsRef.current),
+        Number(firstNumber),
+        Number(secondNumber),
+      ];
+      // Convert array to Uint8Array
+      const dataBuffer = new Uint8Array(dataArray);
+      // Convert Uint8Array to base64
+      let base64Data = btoa(String.fromCharCode.apply(null, dataBuffer));
+
+      console.log('data to Buffer.....');
+      try {
+        // Write the data to the characteristic
+        await commadcharacteristicRef.current.writeWithResponse(base64Data);
+
+        console.log('Data written successfully');
+      } catch (error) {
+        console.error('Error writing data:', error);
+      }
+    } else {
+      console.error('Device or characteristic not available');
+    }
+  };
+
   const connectToDevice = device => {
     return device
       .connect()
@@ -98,7 +162,7 @@ const CommunicationScreen = ({route}) => {
         console.log(`device connected: ${device.id}`);
         setDeviceID(device.id);
         setConnectionStatus('Connected');
-        setIsDeviceConnected(true);
+        setisdeviceconnected(true);
         deviceRef.current = device;
         return device.discoverAllServicesAndCharacteristics();
       })
@@ -163,6 +227,7 @@ const CommunicationScreen = ({route}) => {
             const char3Data = atob(char.value);
             console.log('Received data from characteristic 3:', char3Data);
             index.current = index.current + 1;
+
             writeDataToDevice();
           }
         });
@@ -171,57 +236,6 @@ const CommunicationScreen = ({route}) => {
         console.log(error);
         setConnectionStatus('Error in Connection');
       });
-  };
-
-  const writeDataToDevice = async () => {
-    if (
-      deviceRef.current &&
-      commadcharacteristicRef.current &&
-      isdeviceconnected
-    ) {
-      if (
-        index.current == combinations.length &&
-        startFreqRef.current < endFreqRef.current
-      ) {
-        startFreqRef.current =
-          Number(startFreqRef.current) + Number(stepsRef.current);
-        index.current = 0;
-      }
-
-      if (
-        index == combinations.length &&
-        startFreqRef.current === endFreqRef.current
-      ) {
-        collecting.current = false;
-        console.log('All combination Completed');
-        return;
-      }
-
-      let currentCombination = combinations[index.current];
-      console.log(`currentCombination:${currentCombination}`);
-      let firstNumber = currentCombination[0];
-      let secondNumber = currentCombination[1];
-
-      let dataArray = [
-        startFreqRef.current,
-        dataPointsRef.current,
-        firstNumber,
-        secondNumber,
-      ];
-      // Convert array to Uint8Array
-      const dataBuffer = new Uint8Array(dataArray);
-      console.log('data to Buffer.....');
-      try {
-        // Write the data to the characteristic
-        await commadcharacteristicRef.current.writeWithResponse(dataBuffer);
-
-        console.log('Data written successfully');
-      } catch (error) {
-        console.error('Error writing data:', error);
-      }
-    } else {
-      console.error('Device or characteristic not available');
-    }
   };
 
   return (
@@ -296,7 +310,7 @@ const CommunicationScreen = ({route}) => {
         disabled={collecting.current}
         title="Start"
         color="#fa5043"
-        onPress={() => writeDataToDevice('SET')}
+        onPress={() => onPressStart()}
         style={styles.button}
       />
     </SafeAreaView>
