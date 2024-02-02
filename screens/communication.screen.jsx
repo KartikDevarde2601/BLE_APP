@@ -13,6 +13,8 @@ import {atob, btoa} from 'react-native-quick-base64';
 import {faBluetooth} from '@fortawesome/free-brands-svg-icons/faBluetooth';
 import {combinations} from '../utils/communicationUtils';
 import {BleManager} from 'react-native-ble-plx';
+import base64 from 'react-native-base64';
+
 const bleManager = new BleManager();
 
 const CommunicationScreen = ({route}) => {
@@ -35,8 +37,7 @@ const CommunicationScreen = ({route}) => {
   const commadcharacteristicRef = useRef(null);
 
   const SERVICE_UUID_SENSOR = '9b3333b4-8307-471b-95d1-17fa46507379';
-  const CHARACTERISTIC_UUID_BIZA = 'a420b5f0-43d0-442b-bd01-8fa42172fb67';
-  const CHARACTERISTIC_UUID_PHSA = '728c78e4-ed4c-4c06-abe3-c2c4d365f7c3';
+  const CHARACTERISTIC_SENSOR_DATA = 'a420b5f0-43d0-442b-bd01-8fa42172fb67';
   const CHARACTERISTIC_UUID_COMMAND = 'ea8145ec-d810-471a-877e-177ce5841b63';
   const CHARACTERRISTIC_UUID_CONTROL = 'e344743b-a3c0-4bc3-9449-9ef1eb2f8355';
 
@@ -177,10 +178,7 @@ const CommunicationScreen = ({route}) => {
       })
       .then(characteristics => {
         const char1 = characteristics.find(
-          char => char.uuid === CHARACTERISTIC_UUID_BIZA,
-        );
-        const char2 = characteristics.find(
-          char => char.uuid === CHARACTERISTIC_UUID_PHSA,
+          char => char.uuid === CHARACTERISTIC_SENSOR_DATA,
         );
         const char3 = characteristics.find(
           char => char.uuid === CHARACTERRISTIC_UUID_CONTROL,
@@ -191,7 +189,7 @@ const CommunicationScreen = ({route}) => {
 
         commadcharacteristicRef.current = char4;
 
-        if (!char1 || !char2 || !char3) {
+        if (!char1 || !char3) {
           throw new Error('One or more characteristics not found');
         }
 
@@ -200,20 +198,26 @@ const CommunicationScreen = ({route}) => {
           if (error) {
             console.error(error);
           } else {
-            const char1Data = atob(char.value);
-            console.log('Received data from characteristic 1:', char1Data);
-            // Handle data from char1 as needed
-          }
-        });
+            // Convert base64-encoded data to binary
+            const binaryString = base64.decode(char.value);
 
-        // Monitor char2 after char1
-        char2.monitor((error, char) => {
-          if (error) {
-            console.error(error);
-          } else {
-            const char2Data = atob(char.value);
-            console.log('Received data from characteristic 2:', char2Data);
-            // Handle data from char2 as needed
+            // Create a buffer from the binary string
+            let buffer = new ArrayBuffer(binaryString.length);
+            let view = new Uint8Array(buffer);
+
+            for (let i = 0; i < binaryString.length; i++) {
+              view[i] = binaryString.charCodeAt(i);
+            }
+
+            // Now buffer is an ArrayBuffer. Pass it to the DataView constructor
+            const dataView = new DataView(buffer);
+
+            const bioImpedance = dataView.getFloat64(0, true); // true for little-endian
+            const phaseAngle = dataView.getFloat64(8, true); // Assuming each double is 8 bytes
+
+            // Now you can work with bioImpedance and phaseAngle
+            console.log('Received bioImpedance:', bioImpedance);
+            console.log('Received phaseAngle:', phaseAngle);
           }
         });
 
