@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import CustomAlert from '../components/customAlert';
 import {
   View,
   Text,
@@ -24,6 +25,7 @@ const CommunicationScreen = ({route}) => {
   const [onData, setOnData] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('Searching...');
   const [isdeviceconnected, setisdeviceconnected] = useState(false);
+  const [collecting, setCollecting] = useState(false);
 
   const ReadingDataRef = useRef(false);
   const startFreqRef = useRef(0);
@@ -31,15 +33,16 @@ const CommunicationScreen = ({route}) => {
   const stepsRef = useRef(0);
   const dataPointsRef = useRef(0);
   const index = useRef(0);
-  const collecting = useRef(false);
 
   const deviceRef = useRef(null);
   const commadcharacteristicRef = useRef(null);
+  const InterruptcharacteristicRef = useRef(null);
 
   const SERVICE_UUID_SENSOR = '9b3333b4-8307-471b-95d1-17fa46507379';
   const CHARACTERISTIC_SENSOR_DATA = 'a420b5f0-43d0-442b-bd01-8fa42172fb67';
   const CHARACTERISTIC_UUID_COMMAND = 'ea8145ec-d810-471a-877e-177ce5841b63';
   const CHARACTERRISTIC_UUID_CONTROL = 'e344743b-a3c0-4bc3-9449-9ef1eb2f8355';
+  const CHARACTERISTIC_UUID_INTERRUPT = '9bcec788-0cba-4437-b3b0-b53f0ee37312';
 
   const searchAndConnectToDevice = () => {
     bleManager.startDeviceScan(null, null, (error, device) => {
@@ -82,8 +85,7 @@ const CommunicationScreen = ({route}) => {
           setConnectionStatus('Reconnecting...');
           connectToDevice(deviceRef.current)
             .then(() => {
-              setConnectionStatus('Connected');
-              setisdeviceconnected(true);
+              setConnectionStatus('Reconnected to IHUNDATA');
             })
             .catch(error => {
               console.log('Reconnection failed: ', error);
@@ -96,6 +98,15 @@ const CommunicationScreen = ({route}) => {
   }, [deviceID]);
 
   const onPressStart = () => {
+    if (
+      !startFreqRef.current ||
+      !endFreqRef.current ||
+      !stepsRef.current ||
+      !dataPointsRef.current
+    ) {
+      CustomAlert({type: 'error', message: 'Please fill all the fields'});
+      return;
+    }
     ReadingDataRef.current = true;
     setConnectionStatus('Collecting Data.....');
     writeDataToDevice();
@@ -120,7 +131,7 @@ const CommunicationScreen = ({route}) => {
         index.current === combinations.length &&
         startFreqRef.current === endFreqRef.current
       ) {
-        collecting.current = false;
+        setCollecting(false);
         setConnectionStatus('all Data is been collected');
         console.log('All combination Completed');
         return;
@@ -180,6 +191,9 @@ const CommunicationScreen = ({route}) => {
         const char1 = characteristics.find(
           char => char.uuid === CHARACTERISTIC_SENSOR_DATA,
         );
+        const char2 = characteristics.find(
+          char => char.uuid === CHARACTERISTIC_UUID_INTERRUPT,
+        );
         const char3 = characteristics.find(
           char => char.uuid === CHARACTERRISTIC_UUID_CONTROL,
         );
@@ -188,6 +202,7 @@ const CommunicationScreen = ({route}) => {
         );
 
         commadcharacteristicRef.current = char4;
+        InterruptcharacteristicRef.current = char2;
 
         if (!char1 || !char3) {
           throw new Error('One or more characteristics not found');
@@ -230,9 +245,10 @@ const CommunicationScreen = ({route}) => {
           } else {
             const char3Data = atob(char.value);
             console.log('Received data from characteristic 3:', char3Data);
-            index.current = index.current + 1;
-
-            writeDataToDevice();
+            if (char3Data === 'NEXT') {
+              index.current = index.current + 1;
+              writeDataToDevice();
+            }
           }
         });
       })
@@ -240,6 +256,16 @@ const CommunicationScreen = ({route}) => {
         console.log(error);
         setConnectionStatus('Error in Connection');
       });
+  };
+
+  onPressInterrupt = async () => {
+    ReadingDataRef.current = false;
+    setConnectionStatus('Data Collection Interrupted');
+    try {
+      await InterruptcharacteristicRef.current.writeWithResponse('STOPPED');
+    } catch (error) {
+      console.error('Error writing data:', error);
+    }
   };
 
   return (
@@ -310,13 +336,24 @@ const CommunicationScreen = ({route}) => {
         </View>
       </View>
 
-      <Button
-        disabled={collecting.current}
-        title="Start"
-        color="#fa5043"
-        onPress={() => onPressStart()}
-        style={styles.button}
-      />
+      <View style={styles.buttoncontainer}>
+        <View style={styles.button}>
+          <Button
+            disabled={collecting || !isdeviceconnected}
+            title="Start"
+            color="#fa5043"
+            onPress={() => onPressStart()}
+          />
+        </View>
+        <View style={styles.button}>
+          <Button
+            disabled={collecting}
+            title="Stop"
+            color="#fa5043"
+            onPress={() => onPressInterrupt()}
+          />
+        </View>
+      </View>
     </SafeAreaView>
   );
 };
@@ -384,6 +421,15 @@ const styles = StyleSheet.create({
   },
   logText: {
     flex: 1,
+  },
+  buttoncontainer: {
+    flexDirection: 'row', // Set the direction to horizontal
+    justifyContent: 'space-between', // Space between the buttons
+    padding: 10, // Optional padding for better aesthetics
+  },
+  button: {
+    flex: 1, // Take up all available space
+    margin: 5, // Optional margin for better aesthetics
   },
 });
 
