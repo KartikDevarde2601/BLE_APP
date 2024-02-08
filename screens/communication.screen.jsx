@@ -8,6 +8,7 @@ import {
   ScrollView,
   TextInput,
   Button,
+  Alert,
 } from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {atob, btoa} from 'react-native-quick-base64';
@@ -104,10 +105,14 @@ const CommunicationScreen = ({route}) => {
       !stepsRef.current ||
       !dataPointsRef.current
     ) {
+      Alert('Please fill all the fields');
       CustomAlert({type: 'error', message: 'Please fill all the fields'});
       return;
     }
     ReadingDataRef.current = true;
+    setCollecting(prevState => {
+      return !prevState;
+    });
     setConnectionStatus('Collecting Data.....');
     writeDataToDevice();
   };
@@ -128,10 +133,12 @@ const CommunicationScreen = ({route}) => {
       }
 
       if (
-        index.current === combinations.length &&
-        startFreqRef.current === endFreqRef.current
+        index.current == combinations.length &&
+        startFreqRef.current == endFreqRef.current
       ) {
-        setCollecting(false);
+        setCollecting(prevState => {
+          return !prevState;
+        });
         setConnectionStatus('all Data is been collected');
         console.log('All combination Completed');
         return;
@@ -233,6 +240,14 @@ const CommunicationScreen = ({route}) => {
             // Now you can work with bioImpedance and phaseAngle
             console.log('Received bioImpedance:', bioImpedance);
             console.log('Received phaseAngle:', phaseAngle);
+
+            setOnData(prevState => {
+              return [
+                ...prevState,
+                {type: 'Bio Impedance', data: bioImpedance},
+                {type: 'Phase Angle', data: phaseAngle},
+              ];
+            });
           }
         });
 
@@ -259,6 +274,9 @@ const CommunicationScreen = ({route}) => {
   };
 
   onPressInterrupt = async () => {
+    setCollecting(prevState => {
+      return !prevState;
+    });
     ReadingDataRef.current = false;
     setConnectionStatus('Data Collection Interrupted');
     try {
@@ -347,7 +365,7 @@ const CommunicationScreen = ({route}) => {
         </View>
         <View style={styles.button}>
           <Button
-            disabled={collecting}
+            disabled={!collecting}
             title="Stop"
             color="#fa5043"
             onPress={() => onPressInterrupt()}
