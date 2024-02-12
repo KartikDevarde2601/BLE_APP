@@ -12,7 +12,7 @@ import {
   class BLEServiceInstance {
     manager: BleManager
   
-    device: Device | null
+    device: Device |  null
   
     characteristicMonitor: Subscription | null
   
