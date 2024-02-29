@@ -1,5 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
-import CustomAlert from '../components/customAlert';
+import React, {useEffect, useState, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,134 +12,149 @@ import {
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {atob, btoa} from 'react-native-quick-base64';
 import {faBluetooth} from '@fortawesome/free-brands-svg-icons/faBluetooth';
-import {combinations} from '../utils/communicationUtils';
-import {BleManager} from 'react-native-ble-plx';
-import base64 from 'react-native-base64';
-
-const bleManager = new BleManager();
+import {
+  base64ToArrayBuffer_ESP,
+  base64ToArrayBuffer_Ardiuno,
+} from '../utils/decodingData';
+import {
+  combinations,
+  SERVICE_UUID_SENSOR,
+  SERVICE_UUID_WEBSOCKET,
+  CHARACTERISTIC_UUID_COMMAND,
+  CHARACTERRISTIC_UUID_CONTROL,
+  CHARACTERISTIC_UUID_INTERRUPT,
+  CHARACTERISTIC_UUID_WEBSOCKETIP,
+  SERVICE_UUIDXXX,
+  CHARACTERISTIC_UUID,
+} from '../utils/communicationUtils';
+import {BLEService} from '../services/BLEservices';
+import {useSelector, useDispatch} from 'react-redux';
+import {
+  setDeviceID,
+  setDeviceConnectionStatus,
+  setDeviceConnection,
+  setCollecting,
+} from '../redux/slices/bluetoothSlice';
 
 const CommunicationScreen = ({route}) => {
-  const user = route && route.params ? route.params.user : null;
-
-  const [deviceID, setDeviceID] = useState(null);
+  const dispatch = useDispatch();
   const [onData, setOnData] = useState([]);
-  const [connectionStatus, setConnectionStatus] = useState('Searching...');
-  const [isdeviceconnected, setisdeviceconnected] = useState(false);
-  const [collecting, setCollecting] = useState(false);
 
-  const ReadingDataRef = useRef(false);
-  const startFreqRef = useRef(0);
-  const endFreqRef = useRef(0);
-  const stepsRef = useRef(0);
-  const dataPointsRef = useRef(0);
+  const readingData = useRef(false);
+  const startFreq = useRef(0);
+  const endFreq = useRef(0);
+  const steps = useRef(0);
+  const dataPoints = useRef(0);
   const index = useRef(0);
 
-  const deviceRef = useRef(null);
-  const commadcharacteristicRef = useRef(null);
-  const InterruptcharacteristicRef = useRef(null);
-
-  const SERVICE_UUID_SENSOR = '9b3333b4-8307-471b-95d1-17fa46507379';
-  const CHARACTERISTIC_SENSOR_DATA = 'a420b5f0-43d0-442b-bd01-8fa42172fb67';
-  const CHARACTERISTIC_UUID_COMMAND = 'ea8145ec-d810-471a-877e-177ce5841b63';
-  const CHARACTERRISTIC_UUID_CONTROL = 'e344743b-a3c0-4bc3-9449-9ef1eb2f8355';
-  const CHARACTERISTIC_UUID_INTERRUPT = '9bcec788-0cba-4437-b3b0-b53f0ee37312';
-
-  const searchAndConnectToDevice = () => {
-    bleManager.startDeviceScan(null, null, (error, device) => {
-      if (error) {
-        console.error(error);
-        setConnectionStatus('Error searching for devices');
-        return;
-      }
-      if (device.name === 'IHUBDATA') {
-        bleManager.stopDeviceScan();
-        setConnectionStatus('Connecting...');
-        connectToDevice(device);
-      }
-    });
-  };
+  const {
+    DeviceID,
+    DeviceName,
+    isDeviceConnected,
+    connectionStatus,
+    collecting,
+  } = useSelector(state => state.bluetooth);
 
   useEffect(() => {
-    searchAndConnectToDevice();
+    const setupDevice = async () => {
+      BLEService.searchAndConnectToDevice('ESP32_BLE');
+    };
+
+    setupDevice();
 
     return () => {
-      if (deviceRef.current) {
-        deviceRef.current.cancelConnection();
-        console.log('Disconnected on component unmount');
-      }
+      BLEService.disconnectDevice();
     };
   }, []);
 
   useEffect(() => {
-    const subscription = bleManager.onDeviceDisconnected(
-      deviceID,
-      (error, device) => {
-        if (error) {
-          console.log('Disconnected with error:', error);
-        }
-        setConnectionStatus('Disconnected');
-        setisdeviceconnected(false);
-        ReadingDataRef.current = false;
-        console.log('Disconnected device');
-        if (deviceRef.current) {
-          setConnectionStatus('Reconnecting...');
-          connectToDevice(deviceRef.current)
-            .then(() => {
-              setConnectionStatus('Reconnected to IHUNDATA');
-            })
-            .catch(error => {
-              console.log('Reconnection failed: ', error);
-              setConnectionStatus('Reconnection failed');
-            });
-        }
-      },
-    );
-    return () => subscription.remove();
-  }, [deviceID]);
-
-  const onPressStart = () => {
-    if (
-      !startFreqRef.current ||
-      !endFreqRef.current ||
-      !stepsRef.current ||
-      !dataPointsRef.current
-    ) {
-      Alert('Please fill all the fields');
-      CustomAlert({type: 'error', message: 'Please fill all the fields'});
-      return;
+    if (isDeviceConnected) {
+      console.log('setting Monitoring');
+      setMonitoringCharacteristicsXXXX();
+      // setupMonitorCharateristicControlCommand();
+      // setupMonitorCharateristicIP();
     }
-    ReadingDataRef.current = true;
-    setCollecting(prevState => {
-      return !prevState;
-    });
-    setConnectionStatus('Collecting Data.....');
-    writeDataToDevice();
+  }, [isDeviceConnected]);
+
+  const setMonitoringCharacteristicsXXXX = () => {
+    BLEService.monitorCharacteristic(
+      SERVICE_UUIDXXX,
+      CHARACTERISTIC_UUID,
+      onCharacteristicChangeXXXX,
+      onError,
+    );
+  };
+
+  const setupMonitorCharateristicIP = () => {
+    BLEService.monitorCharacteristic(
+      SERVICE_UUID_WEBSOCKET,
+      CHARACTERISTIC_UUID_WEBSOCKETIP,
+      onCharacteristicIPChange,
+      onError,
+    );
+  };
+
+  const setupMonitorCharateristicControlCommand = () => {
+    BLEService.monitorCharacteristic(
+      SERVICE_UUID_SENSOR,
+      CHARACTERRISTIC_UUID_CONTROL,
+      onCharacteristicControlChange,
+      onError,
+    );
+  };
+
+  const onError = async error => {
+    console.log('Error:', error);
+  };
+
+  const onCharacteristicChangeXXXX = async value => {
+    const binaryString = atob(value);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const dataobject = [];
+    const dataView = new DataView(bytes.buffer);
+    for (let i = 0; i < bytes.length; i += 16) {
+      const magnitude = dataView.getFloat64(i, true);
+      const phase = dataView.getFloat64(i + 8, true);
+      dataobject.push({magnitude, phase});
+    }
+    console.log('Received data from characteristic:', dataobject);
+  };
+
+  const onCharacteristicIPChange = async value => {
+    const IPData = atob(value);
+    console.log('Received data from IP characteristic:', IPData);
+  };
+
+  const onCharacteristicControlChange = async value => {
+    const ControlData = atob(value);
+    console.log('Received data from Control characteristic:', ControlData);
+    if (ControlData === 'NEXT') {
+      index.current = index.current + 1;
+      await writeDataToDevice();
+    }
   };
 
   const writeDataToDevice = async () => {
-    if (
-      deviceRef.current &&
-      commadcharacteristicRef.current &&
-      ReadingDataRef.current
-    ) {
+    if (DeviceID && readingData.current) {
       if (
         index.current == combinations.length &&
-        startFreqRef.current < endFreqRef.current
+        startFreq.current < endFreq.current
       ) {
-        startFreqRef.current =
-          Number(startFreqRef.current) + Number(stepsRef.current);
+        startFreq.current = Number(startFreq.current) + Number(steps.current);
         index.current = 0;
       }
 
       if (
         index.current == combinations.length &&
-        startFreqRef.current == endFreqRef.current
+        startFreq.current == endFreq.current
       ) {
-        setCollecting(prevState => {
-          return !prevState;
-        });
-        setConnectionStatus('all Data is been collected');
-        console.log('All combination Completed');
+        updateState({collecting: false});
+        dispatch(setDeviceConnectionStatus('Data Collection Completed'));
         return;
       }
 
@@ -148,142 +162,43 @@ const CommunicationScreen = ({route}) => {
 
       let firstNumber = currentCombination[0];
       let secondNumber = currentCombination[1];
-
       let dataArray = [
-        Number(startFreqRef.current),
-        Number(dataPointsRef.current),
+        Number(startFreq.current),
+        Number(dataPoints.current),
         Number(firstNumber),
         Number(secondNumber),
       ];
-      // Convert array to Uint8Array
       const dataBuffer = new Uint8Array(dataArray);
-      // Convert Uint8Array to base64
       let base64Data = btoa(String.fromCharCode.apply(null, dataBuffer));
-
-      console.log('data to Buffer.....');
-      try {
-        // Write the data to the characteristic
-        await commadcharacteristicRef.current.writeWithResponse(base64Data);
-
-        console.log('Data written successfully');
-      } catch (error) {
-        console.error('Error writing data:', error);
-      }
-    } else {
-      console.error('Device or characteristic not available');
+      console.log('Data writing');
+      BLEService.writeCharacteristicwithResponseForDevice(
+        SERVICE_UUID_SENSOR,
+        CHARACTERISTIC_UUID_COMMAND,
+        base64Data,
+      );
     }
   };
 
-  const connectToDevice = device => {
-    return device
-      .connect()
-      .then(device => {
-        console.log(`device connected: ${device.id}`);
-        setDeviceID(device.id);
-        setConnectionStatus('Connected');
-        setisdeviceconnected(true);
-        deviceRef.current = device;
-        return device.discoverAllServicesAndCharacteristics();
-      })
-      .then(device => {
-        return device.services();
-      })
-      .then(services => {
-        let service = services.find(
-          service => service.uuid === SERVICE_UUID_SENSOR,
-        );
-        return service.characteristics();
-      })
-      .then(characteristics => {
-        const char1 = characteristics.find(
-          char => char.uuid === CHARACTERISTIC_SENSOR_DATA,
-        );
-        const char2 = characteristics.find(
-          char => char.uuid === CHARACTERISTIC_UUID_INTERRUPT,
-        );
-        const char3 = characteristics.find(
-          char => char.uuid === CHARACTERRISTIC_UUID_CONTROL,
-        );
-        const char4 = characteristics.find(
-          char => char.uuid === CHARACTERISTIC_UUID_COMMAND,
-        );
-
-        commadcharacteristicRef.current = char4;
-        InterruptcharacteristicRef.current = char2;
-
-        if (!char1 || !char3) {
-          throw new Error('One or more characteristics not found');
-        }
-
-        // Monitor char1 first
-        char1.monitor((error, char) => {
-          if (error) {
-            console.error(error);
-          } else {
-            // Convert base64-encoded data to binary
-            const binaryString = base64.decode(char.value);
-
-            // Create a buffer from the binary string
-            let buffer = new ArrayBuffer(binaryString.length);
-            let view = new Uint8Array(buffer);
-
-            for (let i = 0; i < binaryString.length; i++) {
-              view[i] = binaryString.charCodeAt(i);
-            }
-
-            // Now buffer is an ArrayBuffer. Pass it to the DataView constructor
-            const dataView = new DataView(buffer);
-
-            const bioImpedance = dataView.getFloat64(0, true); // true for little-endian
-            const phaseAngle = dataView.getFloat64(8, true); // Assuming each double is 8 bytes
-
-            // Now you can work with bioImpedance and phaseAngle
-            console.log('Received bioImpedance:', bioImpedance);
-            console.log('Received phaseAngle:', phaseAngle);
-
-            setOnData(prevState => {
-              return [
-                ...prevState,
-                {type: 'Bio Impedance', data: bioImpedance},
-                {type: 'Phase Angle', data: phaseAngle},
-              ];
-            });
-          }
-        });
-
-        return char3;
-      })
-      .then(char3 => {
-        char3.monitor((error, char) => {
-          if (error) {
-            console.error(error);
-          } else {
-            const char3Data = atob(char.value);
-            console.log('Received data from characteristic 3:', char3Data);
-            if (char3Data === 'NEXT') {
-              index.current = index.current + 1;
-              writeDataToDevice();
-            }
-          }
-        });
-      })
-      .catch(error => {
-        console.log(error);
-        setConnectionStatus('Error in Connection');
-      });
+  const onPressStart = () => {
+    if (!startFreq || !endFreq || !steps || !dataPoints) {
+      Alert.alert('Please fill all the fields');
+      return;
+    }
+    readingData.current = true;
+    dispatch(setCollecting(true));
+    dispatch(setDeviceConnectionStatus('Collecting Data.....'));
+    writeDataToDevice();
   };
 
-  onPressInterrupt = async () => {
-    setCollecting(prevState => {
-      return !prevState;
-    });
-    ReadingDataRef.current = false;
-    setConnectionStatus('Data Collection Interrupted');
-    try {
-      await InterruptcharacteristicRef.current.writeWithResponse('STOPPED');
-    } catch (error) {
-      console.error('Error writing data:', error);
-    }
+  const onPressInterrupt = async () => {
+    readingData.current = false;
+    dispatch(setCollecting(false));
+    dispatch(setDeviceConnectionStatus('Data Collection Interrupted'));
+    await BLEService.writeCharacteristicwithResponseForDevice(
+      SERVICE_UUID_SENSOR,
+      CHARACTERISTIC_UUID_INTERRUPT,
+      'STOPPED',
+    );
   };
 
   return (
@@ -293,7 +208,7 @@ const CommunicationScreen = ({route}) => {
         <View style={styles.BluetoothContainer}>
           <FontAwesomeIcon
             icon={faBluetooth}
-            color={isdeviceconnected ? 'green' : 'red'}
+            color={isDeviceConnected ? 'green' : 'red'}
             size={25}
           />
         </View>
@@ -315,7 +230,7 @@ const CommunicationScreen = ({route}) => {
         <View style={styles.inputSubcontainer}>
           <TextInput
             onChangeText={text => {
-              startFreqRef.current = text;
+              startFreq.current = text;
             }}
             style={styles.input}
             keyboardType="numeric"
@@ -325,7 +240,7 @@ const CommunicationScreen = ({route}) => {
         <View style={styles.inputSubcontainer}>
           <TextInput
             onChangeText={text => {
-              endFreqRef.current = text;
+              endFreq.current = text;
             }}
             style={styles.input}
             keyboardType="numeric"
@@ -335,7 +250,7 @@ const CommunicationScreen = ({route}) => {
         <View style={styles.inputSubcontainer}>
           <TextInput
             onChangeText={text => {
-              stepsRef.current = text;
+              steps.current = text;
             }}
             style={styles.input}
             keyboardType="numeric"
@@ -345,7 +260,7 @@ const CommunicationScreen = ({route}) => {
         <View style={styles.inputSubcontainer}>
           <TextInput
             onChangeText={text => {
-              dataPointsRef.current = text;
+              dataPoints.current = text;
             }}
             style={styles.input}
             keyboardType="numeric"
@@ -353,14 +268,13 @@ const CommunicationScreen = ({route}) => {
           <Text style={styles.titleText}>DataPoints:</Text>
         </View>
       </View>
-
       <View style={styles.buttoncontainer}>
         <View style={styles.button}>
           <Button
-            disabled={collecting || !isdeviceconnected}
+            disabled={collecting || !isDeviceConnected}
             title="Start"
             color="#fa5043"
-            onPress={() => onPressStart()}
+            onPress={onPressStart}
           />
         </View>
         <View style={styles.button}>
@@ -368,7 +282,7 @@ const CommunicationScreen = ({route}) => {
             disabled={!collecting}
             title="Stop"
             color="#fa5043"
-            onPress={() => onPressInterrupt()}
+            onPress={onPressInterrupt}
           />
         </View>
       </View>
@@ -391,7 +305,7 @@ const styles = StyleSheet.create({
 
   titleText: {
     fontSize: 12,
-    fontWeight: 400,
+    fontWeight: '400',
     color: '#333',
   },
 
@@ -441,13 +355,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   buttoncontainer: {
-    flexDirection: 'row', // Set the direction to horizontal
-    justifyContent: 'space-between', // Space between the buttons
-    padding: 10, // Optional padding for better aesthetics
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 10,
   },
   button: {
-    flex: 1, // Take up all available space
-    margin: 5, // Optional margin for better aesthetics
+    flex: 1,
+    margin: 5,
   },
 });
 

@@ -5,6 +5,8 @@ import {NavigationContainer} from '@react-navigation/native';
 import {BluetoothProvider} from './contextAPI/BluetoothContext';
 import {CommunicationProvider} from './contextAPI/CommunicationContext';
 import {BLEService} from './services/BLEservices';
+import {Provider} from 'react-redux';
+import store from './redux/store';
 
 export default function App() {
   useEffect(() => {
@@ -12,8 +14,10 @@ export default function App() {
   }, []);
 
   return (
-    <NavigationContainer>
-      <MainNavigation />
-    </NavigationContainer>
+    <Provider store={store}>
+      <NavigationContainer>
+        <MainNavigation />
+      </NavigationContainer>
+    </Provider>
   );
 }
