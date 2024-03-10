@@ -8,6 +8,7 @@ export const bluetoothSlice = createSlice({
     isDeviceConnected: false,
     connectionStatus: '',
     collecting: false,
+    settingBelt: false,
   },
   reducers: {
     setDeviceID: (state, action) => {
@@ -25,6 +26,9 @@ export const bluetoothSlice = createSlice({
     setCollecting: (state, action) => {
       state.collecting = action.payload;
     },
+    setsettingBelt: (state, action) => {
+      state.settingBelt = action.payload;
+    },
   },
 });
 
@@ -34,6 +38,7 @@ export const {
   setDeviceConnectionStatus,
   setDeviceConnection,
   setCollecting,
+  setsettingBelt,
 } = bluetoothSlice.actions;
 
 export default bluetoothSlice.reducer;

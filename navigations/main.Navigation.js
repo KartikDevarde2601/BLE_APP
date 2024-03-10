@@ -5,12 +5,24 @@ import {createStackNavigator} from '@react-navigation/stack';
 import CommunicationScreen from '../screens/communication.screen';
 import UserListScreen from '../screens/userlist.screen';
 import MyForm from '../screens/addNewUser.screen';
+import LoginScreen from '../screens/login.screen';
+import AddNewNurse from '../screens/addNewNurse.screen';
 
 const Stack = createStackNavigator();
 
 const MainNavigation = () => {
   return (
-    <Stack.Navigator initialRouteName="UserListScreen">
+    <Stack.Navigator initialRouteName="login">
+      <Stack.Screen
+        name="login"
+        component={LoginScreen}
+        options={{headerShown: false}}
+      />
+      <Stack.Screen
+        name="newNurse"
+        component={AddNewNurse}
+        options={{headerShown: false}}
+      />
       <Stack.Screen
         name="userlist"
         component={UserListScreen}

@@ -8,10 +8,13 @@ import {
   TextInput,
   Button,
   Alert,
+  Pressable,
 } from 'react-native';
 import {FontAwesomeIcon} from '@fortawesome/react-native-fontawesome';
 import {atob, btoa} from 'react-native-quick-base64';
 import {faBluetooth} from '@fortawesome/free-brands-svg-icons/faBluetooth';
+import GraphScreen from '../components/graph';
+import SettingBelt from '../components/settingbelt';
 import {
   base64ToArrayBuffer_ESP,
   base64ToArrayBuffer_Ardiuno,
@@ -19,13 +22,10 @@ import {
 import {
   combinations,
   SERVICE_UUID_SENSOR,
-  SERVICE_UUID_WEBSOCKET,
+  CHARACTERISTIC_SENSOR_DATA,
   CHARACTERISTIC_UUID_COMMAND,
   CHARACTERRISTIC_UUID_CONTROL,
   CHARACTERISTIC_UUID_INTERRUPT,
-  CHARACTERISTIC_UUID_WEBSOCKETIP,
-  SERVICE_UUIDXXX,
-  CHARACTERISTIC_UUID,
 } from '../utils/communicationUtils';
 import {BLEService} from '../services/BLEservices';
 import {useSelector, useDispatch} from 'react-redux';
@@ -34,11 +34,16 @@ import {
   setDeviceConnectionStatus,
   setDeviceConnection,
   setCollecting,
+  setsettingBelt,
 } from '../redux/slices/bluetoothSlice';
+import {
+  setgraphdata,
+  setdata,
+  setAllGraphData,
+} from '../redux/slices/DataSlice';
 
 const CommunicationScreen = ({route}) => {
   const dispatch = useDispatch();
-  const [onData, setOnData] = useState([]);
 
   const readingData = useRef(false);
   const startFreq = useRef(0);
@@ -53,11 +58,12 @@ const CommunicationScreen = ({route}) => {
     isDeviceConnected,
     connectionStatus,
     collecting,
+    settingBelt,
   } = useSelector(state => state.bluetooth);
 
   useEffect(() => {
     const setupDevice = async () => {
-      BLEService.searchAndConnectToDevice('ESP32_BLE');
+      BLEService.searchAndConnectToDevice('IHUBDATA');
     };
 
     setupDevice();
@@ -70,26 +76,16 @@ const CommunicationScreen = ({route}) => {
   useEffect(() => {
     if (isDeviceConnected) {
       console.log('setting Monitoring');
-      setMonitoringCharacteristicsXXXX();
-      // setupMonitorCharateristicControlCommand();
-      // setupMonitorCharateristicIP();
+      setMonitoringCharacteristicsSensorData();
+      setupMonitorCharateristicControlCommand();
     }
   }, [isDeviceConnected]);
 
-  const setMonitoringCharacteristicsXXXX = () => {
+  const setMonitoringCharacteristicsSensorData = () => {
     BLEService.monitorCharacteristic(
-      SERVICE_UUIDXXX,
-      CHARACTERISTIC_UUID,
-      onCharacteristicChangeXXXX,
-      onError,
-    );
-  };
-
-  const setupMonitorCharateristicIP = () => {
-    BLEService.monitorCharacteristic(
-      SERVICE_UUID_WEBSOCKET,
-      CHARACTERISTIC_UUID_WEBSOCKETIP,
-      onCharacteristicIPChange,
+      SERVICE_UUID_SENSOR,
+      CHARACTERISTIC_SENSOR_DATA,
+      onCharacteristicChangeSensorData,
       onError,
     );
   };
@@ -107,7 +103,25 @@ const CommunicationScreen = ({route}) => {
     console.log('Error:', error);
   };
 
-  const onCharacteristicChangeXXXX = async value => {
+  const gettime = () => {
+    const date = new Date();
+  };
+
+  const prepareSensorData = data => {
+    return data.map(item => ({
+      frequency: startFreq.current,
+      postGenerator: combinations[index.current][0],
+      postSensor: combinations[index.current][1],
+      bioimpedance: item.magnitude,
+      phaseAngle: item.phase,
+      stepSize: steps.current,
+      numberOfDataPoints: dataPoints.current,
+      timeseries: gettime(),
+    }));
+  };
+
+  const onCharacteristicChangeSensorData = async value => {
+    console.log('data Recived');
     const binaryString = atob(value);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
@@ -123,11 +137,8 @@ const CommunicationScreen = ({route}) => {
       dataobject.push({magnitude, phase});
     }
     console.log('Received data from characteristic:', dataobject);
-  };
-
-  const onCharacteristicIPChange = async value => {
-    const IPData = atob(value);
-    console.log('Received data from IP characteristic:', IPData);
+    dispatch(setdata(prepareSensorData(dataobject)));
+    dispatch(setgraphdata(dataobject));
   };
 
   const onCharacteristicControlChange = async value => {
@@ -135,6 +146,7 @@ const CommunicationScreen = ({route}) => {
     console.log('Received data from Control characteristic:', ControlData);
     if (ControlData === 'NEXT') {
       index.current = index.current + 1;
+      dispatch(setAllGraphData());
       await writeDataToDevice();
     }
   };
@@ -214,14 +226,9 @@ const CommunicationScreen = ({route}) => {
         </View>
       </View>
       <ScrollView style={styles.scrollContainer}>
-        <Text style={{fontSize: 20, color: '#fa5043'}}>Data Transmission</Text>
-        {onData.map((item, index) => (
-          <View key={index} style={styles.logContainer}>
-            <Text numberOfLines={1} ellipsizeMode="tail" style={styles.logText}>
-              {`${item.type} : ${item.data}`}
-            </Text>
-          </View>
-        ))}
+        <View style={styles.GraphContainer}>
+          {settingBelt ? <GraphScreen /> : <SettingBelt />}
+        </View>
       </ScrollView>
       <View>
         <Text>{connectionStatus}</Text>
@@ -331,11 +338,15 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    margin: 10,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 10,
-    padding: 10,
+  },
+  GraphContainer: {
+    flex: 1,
+    borderColor: '#ddd',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   input: {
     height: 50,

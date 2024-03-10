@@ -3,9 +3,10 @@ import {Model} from '@nozbe/watermelondb';
 import {
   field,
   children,
-  action,
   readonly,
   date,
+  writer,
+  action,
 } from '@nozbe/watermelondb/decorators';
 
 //....................MODEL....................
@@ -22,7 +23,7 @@ export default class Nurse extends Model {
   @field('doctorId') doctorId;
   @field('doctorName') doctorName;
   @children('patients') patients;
-  @readonly @data('createdAt') createdAt;
+  @readonly @date('createdAt') createdAt;
   @readonly @date('updatedAt') updatedAt;
 
   @action async getNurse() {
@@ -60,14 +61,13 @@ export default class Nurse extends Model {
     ]);
   }
 
-  @action async addPatient(
+  @writer async addPatient(
     patientData,
     medicationHistoryData,
     comorbiditiesData,
     visitData,
   ) {
     return await this.collections.get('patients').create(patient => {
-      patient._id = patientData._id;
       patient.name = patientData.name;
       patient.age = patientData.age;
       patient.gender = patientData.gender;

@@ -30,6 +30,7 @@ export default class Patient extends Model {
   @field('bloodGroup') bloodGroup;
   @field('email') email;
   @field('role') role;
+  @field('nurseName') nurseName;
   @relation('nurse', 'nurse_id') nurse;
   @children('comorbidities') comorbidities;
   @children('medicalrecords') medicalrecords;

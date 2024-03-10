@@ -49,7 +49,33 @@ const MyForm = () => {
   };
 
   const handleSubmit = values => {
-    console.log(values);
+    const {
+      comorbidities,
+      medicationHistory,
+      IBM,
+      name,
+      email,
+      bloodGroup,
+      gender,
+      password,
+      race,
+      weight,
+      age,
+      height,
+    } = values;
+
+    const patientData = {
+      name,
+      age,
+      IBM,
+      email,
+      bloodGroup,
+      gender,
+      password,
+      race,
+      weight,
+      height,
+    };
   };
 
   return (

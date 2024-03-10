@@ -4,7 +4,7 @@ import {appSchema, tableSchema} from '@nozbe/watermelondb';
 //......................TABLE SCHEMA.....................
 //TODO: add more table schema DOCTOR, ADMIN
 
-export default appSchema({
+const Myschema = appSchema({
   version: 1,
   tables: [
     tableSchema({
@@ -29,7 +29,7 @@ export default appSchema({
         {name: 'height', type: 'number'},
         {name: 'weight', type: 'number'},
         {name: 'BMI', type: 'number'},
-        {name: bloodGroup, type: 'string'},
+        {name: 'bloodGroup', type: 'string'},
         {name: 'email', type: 'string'},
         {name: 'role', type: 'string'},
         {name: 'nurse_id', type: 'string', isIndexed: true},
@@ -45,7 +45,7 @@ export default appSchema({
         {name: 'diabetes', type: 'boolean'},
         {name: 'HTN', type: 'boolean'},
         {name: 'asthma', type: 'boolean'},
-        {name: 'somking:', type: 'boolean'},
+        {name: 'smoking:', type: 'boolean'},
         {name: 'alcohol', type: 'boolean'},
         {name: 'kidneyDisease', type: 'boolean'},
         {name: 'pastMI', type: 'boolean'},
@@ -93,3 +93,5 @@ export default appSchema({
     }),
   ],
 });
+
+export default Myschema;

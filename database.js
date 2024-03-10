@@ -1,8 +1,3 @@
-import 'react-native-gesture-handler';
-import {AppRegistry} from 'react-native';
-import App from './App';
-import {name as appName} from './app.json';
-
 //.................LIBRARY.......................
 import {Database} from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
@@ -24,10 +19,8 @@ const adapter = new SQLiteAdapter({
   },
 });
 
-const database = new Database({
+export const database = new Database({
   adapter,
   modelClasses: dbModels,
   actionsEnabled: true,
 });
-
-AppRegistry.registerComponent(appName, () => App);
